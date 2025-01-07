@@ -2,18 +2,38 @@ R1:
   port_telnet: 5001
   AS_number: 1
   interface:
-    GigabitEthernet1/0: R2
-    GigabitEthernet2/0: R3
+    GigabitEthernet1/0:
+      R2: GigabitEthernet1/0
+      R4: GigabitEthernet1/0
+    GigabitEthernet2/0:
+      R3: GigabitEthernet2/0
+    GigabitEthernet3/0:
+      R2: GigabitEthernet3/0
 R2:
   port_telnet: 5002
   AS_number: 2
   interface:
-    GigabitEthernet1/0: R1
-    GigabitEthernet2/0: R3
+    GigabitEthernet1/0:
+      R1: GigabitEthernet1/0
+      R4: GigabitEthernet1/0
+    GigabitEthernet2/0:
+      R3: GigabitEthernet1/0
+    GigabitEthernet3/0:
+      R1: GigabitEthernet3/0
 
 R3:
   port_telnet: 5003
   AS_number: 2
   interface:
-    GigabitEthernet1/0: R2
-    GigabitEthernet2/0: R1
+    GigabitEthernet1/0:
+      R2: GigabitEthernet2/0
+    GigabitEthernet2/0:
+      R1: GigabitEthernet2/0
+
+R4:
+  port_telnet: 5004
+  AS_number: 1
+  interface:
+    GigabitEthernet1/0:
+      R1: GigabitEthernet1/0
+      R2: GigabitEthernet1/0
