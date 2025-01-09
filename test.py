@@ -24,10 +24,13 @@ def get_connections(routeur_data):
 
 
 
-def get_subnets(connections, routeur_data, as_data):
+def get_subnets_and_router_ips(connections, routeur_data, as_data):
     subnets = {}
+    router_ips = {}
     as_subnets = {}
+    subnet_routers = {}
 
+    # Initialisation des sous-réseaux par AS
     for as_id, as_entry in as_data.items():
         subnets_brut = as_entry.get('plage_adresse', [])
         as_subnets[as_id] = []
@@ -38,26 +41,40 @@ def get_subnets(connections, routeur_data, as_data):
 
     tous_les_subnets = set()
 
+    # Attribution des sous-réseaux et des adresses IP
     for (routeur1, interface1), (routeur2, interface2) in connections:
-        # Attribuer un sous-réseau uniquement si les deux interfaces n'en ont pas déjà un
         if (routeur1, interface1) not in subnets and (routeur2, interface2) not in subnets:
             as_id1 = str(routeur_data[routeur1]['AS_number'])
             as_id2 = str(routeur_data[routeur2]['AS_number'])
             as_id = as_id1 if as_id1 <= as_id2 else as_id2
+            
             subnet = next(as_subnets[as_id])
-            if subnet not in tous_les_subnets:
-                subnets[(routeur1, interface1)] = str(subnet)
+            while subnet in tous_les_subnets:
+                subnet = next(as_subnets[as_id])
+            
+            subnets[(routeur1, interface1)] = str(subnet)
+            subnets[(routeur2, interface2)] = str(subnet)
+            tous_les_subnets.add(subnet)
+            subnet_routers[subnet] = set([(routeur1,interface1), (routeur2,interface2)])
+        else:
+            if (routeur1, interface1) in subnets:
+                subnet = ipaddress.IPv6Network(subnets[(routeur1, interface1)])
                 subnets[(routeur2, interface2)] = str(subnet)
-                tous_les_subnets.add(subnet)
             else:
-                while True:
-                    subnet = next(as_subnets[as_id])
-                    if subnet not in tous_les_subnets:
-                        subnets[(routeur1, interface1)] = str(subnet)
-                        subnets[(routeur2, interface2)] = str(subnet)
-                        tous_les_subnets.add(subnet)
-                        break
-    return subnets
+                subnet = ipaddress.IPv6Network(subnets[(routeur2, interface2)])
+                subnets[(routeur1, interface1)] = str(subnet)
+            
+            subnet_routers[subnet].add((routeur1,interface1))
+            subnet_routers[subnet].add((routeur2,interface2))
+
+    # Attribution des adresses IP aux routeurs
+    for subnet, routers in subnet_routers.items():
+        for i, router in enumerate(routers):
+            if router not in router_ips:
+                router_ips[router] = str(subnet[i+1])
+
+    return subnets, router_ips
+
 
 def affiche_connexion(connections, subnets):
     print("Connexions entre routeurs avec sous-réseaux:")
@@ -73,7 +90,7 @@ def affiche_erreur(erreurs):
     else:
         print("\nAucune incohérence trouvée.")
 
-def configure_routeur_telnet(routeur, config, subnets, as_data):
+def configure_routeur_telnet(routeur, config, subnets, ips, connections):
     """Configure les routeurs via Telnet avec Exscript."""
     try:
         host = "localhost"
@@ -88,7 +105,7 @@ def configure_routeur_telnet(routeur, config, subnets, as_data):
         
         for (r, interface), subnet in subnets.items():
             if r == routeur and subnet != "Aucune plage disponible":
-                ipv6_address = ipaddress.IPv6Network(subnet).network_address + 1
+                ipv6_address = ips[(r,interface)]
                 conn.send(f"interface {interface}\r")
                 conn.send(f"ipv6 address {ipv6_address}/{ipaddress.IPv6Network(subnet).prefixlen}\r")
                 conn.send("no shutdown\r")
@@ -117,12 +134,12 @@ if __name__ == "__main__":
 
         connections, erreurs = get_connections(routeur_data)
 
-        subnets = get_subnets(connections, routeur_data, as_data)
+        subnets,ips = get_subnets_and_router_ips(connections, routeur_data, as_data)
         affiche_connexion(connections, subnets)
         affiche_erreur(erreurs)
 
         for routeur, config in routeur_data.items():
-            configure_routeur_telnet(routeur, config, subnets, as_data)
+            configure_routeur_telnet(routeur, config, subnets, ips, connections)
 
     except FileNotFoundError:
         print(f"Erreur : Fichier non trouvé.")
