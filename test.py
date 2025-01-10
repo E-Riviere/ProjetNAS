@@ -102,15 +102,17 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections):
 
 
         conn.send("\rconfigure terminal\r")
-        
+        conn.send("ipv6 unicast-routing\r")
         for (r, interface), subnet in subnets.items():
             if r == routeur and subnet != "Aucune plage disponible":
                 ipv6_address = ips[(r,interface)]
                 conn.send(f"interface {interface}\r")
                 conn.send(f"ipv6 address {ipv6_address}/{ipaddress.IPv6Network(subnet).prefixlen}\r")
+                conn.send(f"ipv6 enable\r")
                 conn.send("no shutdown\r")
+                conn.send("exit\r")
         conn.send("end\r")
-        conn.send("write memory\r\r")
+        #conn.send("write memory\r\r")
         conn.send("exit\r")
         print("OKk")
         #conn.close() Faudrait faire ça pour fermer proprement les connections telnet, mais dans ce cas là le programme plante ????
