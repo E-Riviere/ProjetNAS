@@ -129,7 +129,6 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections):
 if __name__ == "__main__":
     as_file = "as.yml"
     routeur_file = "routeur.yml"
-
     try:
         as_data = load_yaml(as_file)
         routeur_data = load_yaml(routeur_file)
@@ -142,7 +141,6 @@ if __name__ == "__main__":
 
         for routeur, config in routeur_data.items():
             configure_routeur_telnet(routeur, config, subnets, ips, connections)
-
     except FileNotFoundError:
         print(f"Erreur : Fichier non trouvé.")
     except Exception as e:
