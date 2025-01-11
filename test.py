@@ -22,11 +22,25 @@ def get_connections(routeur_data):
 
     return connections, erreur
 
+def check_for_duplicates_ips(subnets, ips):
+    ip_set = set()
+    subnet_set = set()
 
+    for interface, ip in ips.items():
+        if ip in ip_set:
+            return f"Adresse IP dupliquée: {interface} ({ip})"
+        ip_set.add(ip)
+
+    for interface, subnet in subnets.items():
+        if subnet in subnet_set:
+            return f"Sous-réseau dupliqué: {interface} ({subnet})"
+        subnet_set.add(subnet)
+
+    return None
 
 def get_subnets_and_router_ips(connections, routeur_data, as_data):
     subnets = {}
-    router_ips = {}
+    interface_ips = {}
     as_subnets = {}
     subnet_routers = {}
 
@@ -67,13 +81,33 @@ def get_subnets_and_router_ips(connections, routeur_data, as_data):
             subnet_routers[subnet].add((routeur1,interface1))
             subnet_routers[subnet].add((routeur2,interface2))
 
-    # Attribution des adresses IP aux routeurs
-    for subnet, routers in subnet_routers.items():
-        for i, router in enumerate(routers):
-            if router not in router_ips:
-                router_ips[router] = str(subnet[i+1])
 
-    return subnets, router_ips
+    # Attribution des adresses de Loopback
+    for as_id in as_data:
+        subnet = next(as_subnets[as_id])
+        while subnet in tous_les_subnets:
+            subnet = next(as_subnets[as_id])
+        tous_les_subnets.add(subnet)
+        loopback_address = subnet.subnets(new_prefix=128)
+        for routeur, config in routeur_data.items():
+            if routeur_data[routeur]['AS_number'] == int(as_id):
+                subnets[(routeur, 'Loopback0')] = str(next(loopback_address))
+                interface_ips[(routeur, 'Loopback0')] = ipaddress.IPv6Network(subnets[(routeur, 'Loopback0')]).network_address
+
+
+
+
+
+
+    # Attribution des adresses IP aux interfaces des routeurs
+    for subnet, routers in subnet_routers.items():
+        for i, interface in enumerate(routers):
+            if interface not in interface_ips:
+                interface_ips[interface] = str(subnet[i+1])
+    
+
+    
+    return subnets, interface_ips
 
 
 def affiche_connexion(connections, subnets):
@@ -90,7 +124,7 @@ def affiche_erreur(erreurs):
     else:
         print("\nAucune incohérence trouvée.")
 
-def configure_routeur_telnet(routeur, config, subnets, ips, connections):
+def configure_routeur_telnet(routeur, config, subnets, ips, connections,IGP):
     """Configure les routeurs via Telnet avec Exscript."""
     try:
         host = "localhost"
@@ -98,24 +132,51 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections):
         conn = Telnet()
         conn.connect(host, port)
         print(f"Connexion à {routeur} sur le port {port}...")
-
-
-
         conn.send("\rconfigure terminal\r")
         conn.send("ipv6 unicast-routing\r")
+<<<<<<< HEAD
+=======
+        if IGP == "OSPF":
+            conn.send("ipv6 router ospf 1\r")
+            routeurnum = int(routeur[-1])
+            conn.send(f"router-id {routeurnum//(256*256*256)}.{routeurnum% (256*256*256) // (256*256)}.{routeurnum % (256*256) // 256}.{routeurnum%256} \r")
+            conn.send("exit\r")
+
+        elif IGP == "RIP":
+            conn.send("ipv6 router rip RIPng\r")
+            conn.send("redistribute connected\r")
+            conn.send("exit\r")
+        
+        
+>>>>>>> de7ab5c (Configuration automatique de OSPF et RIP + attribution d'addresse de loopback)
         for (r, interface), subnet in subnets.items():
             if r == routeur and subnet != "Aucune plage disponible":
                 ipv6_address = ips[(r,interface)]
                 conn.send(f"interface {interface}\r")
                 conn.send(f"ipv6 address {ipv6_address}/{ipaddress.IPv6Network(subnet).prefixlen}\r")
+<<<<<<< HEAD
                 conn.send(f"ipv6 enable\r")
                 conn.send("no shutdown\r")
                 conn.send("exit\r")
         conn.send("end\r")
         #conn.send("write memory\r\r")
+=======
+                conn.send("ipv6 enable\r")
+                conn.send("no shutdown\r")
+                if IGP == "OSPF":
+                    conn.send("ipv6 ospf 1 area 0\r")
+                elif IGP == "RIP":
+                    conn.send("ipv6 rip RIPng enable\r")
+        
+        
+>>>>>>> de7ab5c (Configuration automatique de OSPF et RIP + attribution d'addresse de loopback)
         conn.send("exit\r")
-        print("OKk")
-        #conn.close() Faudrait faire ça pour fermer proprement les connections telnet, mais dans ce cas là le programme plante ????
+        conn.send("exit\r")
+        #conn.send("write memory\r\r")
+        # wait for all the command to finish by looking for the prompt of the ping command on loopback
+        conn.send(f"ping {ips[(routeur, 'Loopback0')]}\r")
+        conn.waitfor("Sending 5, 100-byte ICMP Echos")
+        #conn.close()# Faudrait faire ça pour fermer proprement les connections telnet, mais dans ce cas là le programme plante ????
 
         print(f"Configuration de {routeur} terminée.")
 
@@ -138,9 +199,14 @@ if __name__ == "__main__":
         subnets,ips = get_subnets_and_router_ips(connections, routeur_data, as_data)
         affiche_connexion(connections, subnets)
         affiche_erreur(erreurs)
-
+        check_for_duplicates_ips(subnets, ips)
         for routeur, config in routeur_data.items():
+<<<<<<< HEAD
             configure_routeur_telnet(routeur, config, subnets, ips, connections)
+=======
+            configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data[str(routeur_data[routeur]['AS_number'])]['igp'])
+
+>>>>>>> de7ab5c (Configuration automatique de OSPF et RIP + attribution d'addresse de loopback)
     except FileNotFoundError:
         print(f"Erreur : Fichier non trouvé.")
     except Exception as e:
