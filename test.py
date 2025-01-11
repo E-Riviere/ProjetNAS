@@ -134,8 +134,6 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections,IGP):
         print(f"Connexion à {routeur} sur le port {port}...")
         conn.send("\rconfigure terminal\r")
         conn.send("ipv6 unicast-routing\r")
-<<<<<<< HEAD
-=======
         if IGP == "OSPF":
             conn.send("ipv6 router ospf 1\r")
             routeurnum = int(routeur[-1])
@@ -148,19 +146,11 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections,IGP):
             conn.send("exit\r")
         
         
->>>>>>> de7ab5c (Configuration automatique de OSPF et RIP + attribution d'addresse de loopback)
         for (r, interface), subnet in subnets.items():
             if r == routeur and subnet != "Aucune plage disponible":
                 ipv6_address = ips[(r,interface)]
                 conn.send(f"interface {interface}\r")
                 conn.send(f"ipv6 address {ipv6_address}/{ipaddress.IPv6Network(subnet).prefixlen}\r")
-<<<<<<< HEAD
-                conn.send(f"ipv6 enable\r")
-                conn.send("no shutdown\r")
-                conn.send("exit\r")
-        conn.send("end\r")
-        #conn.send("write memory\r\r")
-=======
                 conn.send("ipv6 enable\r")
                 conn.send("no shutdown\r")
                 if IGP == "OSPF":
@@ -169,7 +159,6 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections,IGP):
                     conn.send("ipv6 rip RIPng enable\r")
         
         
->>>>>>> de7ab5c (Configuration automatique de OSPF et RIP + attribution d'addresse de loopback)
         conn.send("exit\r")
         conn.send("exit\r")
         #conn.send("write memory\r\r")
@@ -201,12 +190,8 @@ if __name__ == "__main__":
         affiche_erreur(erreurs)
         check_for_duplicates_ips(subnets, ips)
         for routeur, config in routeur_data.items():
-<<<<<<< HEAD
-            configure_routeur_telnet(routeur, config, subnets, ips, connections)
-=======
             configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data[str(routeur_data[routeur]['AS_number'])]['igp'])
 
->>>>>>> de7ab5c (Configuration automatique de OSPF et RIP + attribution d'addresse de loopback)
     except FileNotFoundError:
         print(f"Erreur : Fichier non trouvé.")
     except Exception as e:
