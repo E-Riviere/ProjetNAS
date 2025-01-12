@@ -1,6 +1,16 @@
+import re
+import time
 import yaml
 import ipaddress
 from Exscript.protocols import Telnet
+
+
+# TODO : delete this memo when the code is finished
+# ips : ('R1', 'Loopback0') -> '2001:db8:1::1'
+# subnets : ('R1', 'GigabitEthernet0/0') -> '2001:db8:1::/64'
+# routeur_data : 'R1' -> {'AS_number': 1, 'port_telnet': 2001, 'interface': {'GigabitEthernet0/0': {'R2': 'GigabitEthernet0/0'}}}
+# as_data : '1' -> {'igp': 'OSPF', 'plage_adresse': ['2001:db8:1::/48', '2001:db8:2::/48']}
+
 
 def load_yaml(filename):
     with open(filename, 'r') as file:
@@ -22,6 +32,19 @@ def get_connections(routeur_data):
 
     return connections, erreur
 
+def get_AS_number_from_subnet(subnet, as_data):
+    for as_id, as_entry in as_data.items():
+        for subnet_brut in as_entry.get('plage_adresse', []):
+            int_subnet = int(ipaddress.IPv6Network(subnet).network_address)
+            int_subnet_brut = int(ipaddress.IPv6Network(subnet_brut).network_address)
+            int_mask = int(ipaddress.IPv6Network(subnet_brut).netmask)
+
+            if int_subnet&int_mask == int_subnet_brut&int_mask: 
+                return int(as_id)
+
+    return None
+
+
 def check_for_duplicates_ips(subnets, ips):
     ip_set = set()
     subnet_set = set()
@@ -30,11 +53,13 @@ def check_for_duplicates_ips(subnets, ips):
         if ip in ip_set:
             return f"Adresse IP dupliquée: {interface} ({ip})"
         ip_set.add(ip)
-
+        print(f"{interface} : {ip}")
+    
     for interface, subnet in subnets.items():
         if subnet in subnet_set:
             return f"Sous-réseau dupliqué: {interface} ({subnet})"
         subnet_set.add(subnet)
+    
 
     return None
 
@@ -92,7 +117,7 @@ def get_subnets_and_router_ips(connections, routeur_data, as_data):
         for routeur, config in routeur_data.items():
             if routeur_data[routeur]['AS_number'] == int(as_id):
                 subnets[(routeur, 'Loopback0')] = str(next(loopback_address))
-                interface_ips[(routeur, 'Loopback0')] = ipaddress.IPv6Network(subnets[(routeur, 'Loopback0')]).network_address
+                interface_ips[(routeur, 'Loopback0')] = str(ipaddress.IPv6Network(subnets[(routeur, 'Loopback0')]).network_address)
 
 
 
@@ -110,11 +135,21 @@ def get_subnets_and_router_ips(connections, routeur_data, as_data):
     return subnets, interface_ips
 
 
-def affiche_connexion(connections, subnets):
+def affiche_connexion(connections, subnets, routeur_data):
     print("Connexions entre routeurs avec sous-réseaux:")
     for (routeur1, interface1), (routeur2, interface2) in connections:
         subnet1 = subnets.get((routeur1, interface1), "Non attribué")
-        print(f"{routeur1} ({interface1}) <-> {routeur2} ({interface2}): {subnet1}")
+
+    print("\nSous-réseaux attribués pour le loopback par AS :")
+    as_visited = set()
+    for interface ,subnet in subnets.items():
+        if interface[1] == 'Loopback0' and routeur_data[interface[0]]['AS_number'] not in as_visited:
+            as_visited.add(routeur_data[interface[0]]['AS_number'])
+
+            print(f"AS : {routeur_data[interface[0]]['AS_number']} : {subnet}")
+
+
+
 
 def affiche_erreur(erreurs):
     if erreurs:
@@ -124,9 +159,10 @@ def affiche_erreur(erreurs):
     else:
         print("\nAucune incohérence trouvée.")
 
-def configure_routeur_telnet(routeur, config, subnets, ips, connections,IGP):
+def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data):
     """Configure les routeurs via Telnet avec Exscript."""
     try:
+        IGP = as_data[str(config['AS_number'])]['igp']
         host = "localhost"
         port = config['port_telnet']
         conn = Telnet()
@@ -134,16 +170,8 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections,IGP):
         print(f"Connexion à {routeur} sur le port {port}...")
         conn.send("\rconfigure terminal\r")
         conn.send("ipv6 unicast-routing\r")
-        if IGP == "OSPF":
-            conn.send("ipv6 router ospf 1\r")
-            routeurnum = int(routeur[-1])
-            conn.send(f"router-id {routeurnum//(256*256*256)}.{routeurnum% (256*256*256) // (256*256)}.{routeurnum % (256*256) // 256}.{routeurnum%256} \r")
-            conn.send("exit\r")
 
-        elif IGP == "RIP":
-            conn.send("ipv6 router rip RIPng\r")
-            conn.send("redistribute connected\r")
-            conn.send("exit\r")
+
         
         
         for (r, interface), subnet in subnets.items():
@@ -157,9 +185,84 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections,IGP):
                     conn.send("ipv6 ospf 1 area 0\r")
                 elif IGP == "RIP":
                     conn.send("ipv6 rip RIPng enable\r")
-        
-        
         conn.send("exit\r")
+        routeur_num = int(routeur[-1])   
+        routeur_id = f"{routeur_num//(256*256*256)+1}.{routeur_num% (256*256*256) // (256*256)}.{routeur_num % (256*256) // 256}.{routeur_num%256}"
+        # Configuration de l'IGP
+        if IGP == "OSPF":
+            conn.send("ipv6 router ospf 1\r")
+            
+            conn.send(f"router-id {routeur_id} \r")
+            for (routeur1, interface1), (routeur2, interface2) in connections:
+                if routeur == routeur1:
+                    voisin = routeur2
+                    interface = interface1
+                elif routeur == routeur2:
+                    voisin = routeur1
+                    interface = interface2
+                else:
+                    voisin = None
+                if voisin and routeur_data[voisin]['AS_number'] != config['AS_number']:
+                    conn.send(f"passive-interface {interface}\r")
+            conn.send("exit\r")
+
+        elif IGP == "RIP":
+            conn.send("ipv6 router rip RIPng\r")
+            conn.send("redistribute connected\r")
+            conn.send("exit\r")
+        
+        # Configuration BGP
+        conn.send(f"router bgp {config['AS_number']}\r")
+        conn.send("no bgp default ipv4-unicast\r")
+        conn.send(f"bgp router-id {routeur_id}\r")
+        conn.send("address-family ipv6 unicast\r")
+        for routeur_id , config_routeur in routeur_data.items():
+                if config_routeur['AS_number'] == config['AS_number'] and routeur != routeur_id:
+                    conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} remote-as {config['AS_number']}\r")
+                    conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} update-source Loopback0\r")
+                    conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} disable-connected-check\r")
+                    conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} activate\r")
+        eBGP = False
+        
+        for (routeur1, interface1), (routeur2, interface2) in connections:
+            
+            if routeur == routeur1:
+                voisin = routeur2
+                interface_voisin = interface2
+
+            elif routeur == routeur2:
+                voisin = routeur1
+                interface_voisin = interface1
+            else:
+                voisin = None
+                interface_voisin = None
+            if voisin:
+                if routeur_data[voisin]['AS_number'] != config['AS_number']:
+                    eBGP = True
+                    conn.send(f"neighbor {ips[(voisin, interface_voisin)]} remote-as {routeur_data[voisin]['AS_number']}\r")
+                    conn.send(f"neighbor {ips[(voisin, interface_voisin)]} activate\r")
+        
+        networks_to_advertise = "all"
+        advertised_networks = set()
+        if eBGP:
+            if networks_to_advertise == "all":
+                for subnet in subnets.values():
+                    
+                    if subnet != "Aucune plage disponible" and ipaddress.IPv6Network(subnet).prefixlen != 128 and subnet not in advertised_networks:
+                        if get_AS_number_from_subnet(subnet, as_data) == config['AS_number']:
+                            advertised_networks.add(subnet)
+                            conn.send(f"network {subnet}\r")
+
+
+            else:
+                for subnet in networks_to_advertise:
+                    conn.send(f"network {subnet}\r")
+                
+
+        conn.send("exit\r")
+
+        conn.send("exit\r")
+                
         conn.send("exit\r")
         #conn.send("write memory\r\r")
         # wait for all the command to finish by looking for the prompt of the ping command on loopback
@@ -169,10 +272,14 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections,IGP):
 
         print(f"Configuration de {routeur} terminée.")
 
+
+        
+
     except Exception as e:
         print(f"Erreur lors de la configuration de {routeur}: {e}")
-    
 
+
+    
 
     
 
@@ -184,13 +291,16 @@ if __name__ == "__main__":
         routeur_data = load_yaml(routeur_file)
 
         connections, erreurs = get_connections(routeur_data)
-
+        
         subnets,ips = get_subnets_and_router_ips(connections, routeur_data, as_data)
-        affiche_connexion(connections, subnets)
+        affiche_connexion(connections, subnets, routeur_data)
         affiche_erreur(erreurs)
         check_for_duplicates_ips(subnets, ips)
+
         for routeur, config in routeur_data.items():
-            configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data[str(routeur_data[routeur]['AS_number'])]['igp'])
+            configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data)
+
+
 
     except FileNotFoundError:
         print(f"Erreur : Fichier non trouvé.")
