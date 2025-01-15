@@ -1,5 +1,3 @@
-import re
-import time
 import yaml
 import ipaddress
 from Exscript.protocols import Telnet
@@ -137,8 +135,6 @@ def get_subnets_and_router_ips(connections, routeur_data, as_data):
 
 def affiche_connexion(connections, subnets, routeur_data):
     print("Connexions entre routeurs avec sous-réseaux:")
-    for (routeur1, interface1), (routeur2, interface2) in connections:
-        subnet1 = subnets.get((routeur1, interface1), "Non attribué")
 
     print("\nSous-réseaux attribués pour le loopback par AS :")
     as_visited = set()
