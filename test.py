@@ -1,7 +1,7 @@
 import yaml
 import ipaddress
 from Exscript.protocols import Telnet
-
+import multiprocessing
 
 # TODO : delete this memo when the code is finished
 # ips : ('R1', 'Loopback0') -> '2001:db8:1::1'
@@ -38,7 +38,7 @@ def get_AS_number_from_subnet(subnet, as_data):
             int_mask = int(ipaddress.IPv6Network(subnet_brut).netmask)
 
             if int_subnet&int_mask == int_subnet_brut&int_mask: 
-                return int(as_id)
+                return as_id
 
     return None
 
@@ -81,8 +81,8 @@ def get_subnets_and_router_ips(connections, routeur_data, as_data):
     # Attribution des sous-réseaux et des adresses IP
     for (routeur1, interface1), (routeur2, interface2) in connections:
         if (routeur1, interface1) not in subnets and (routeur2, interface2) not in subnets:
-            as_id1 = str(routeur_data[routeur1]['AS_number'])
-            as_id2 = str(routeur_data[routeur2]['AS_number'])
+            as_id1 = routeur_data[routeur1]['AS_number']
+            as_id2 = routeur_data[routeur2]['AS_number']
             as_id = as_id1 if as_id1 <= as_id2 else as_id2
             
             subnet = next(as_subnets[as_id])
@@ -113,7 +113,7 @@ def get_subnets_and_router_ips(connections, routeur_data, as_data):
         tous_les_subnets.add(subnet)
         loopback_address = subnet.subnets(new_prefix=128)
         for routeur, config in routeur_data.items():
-            if routeur_data[routeur]['AS_number'] == int(as_id):
+            if routeur_data[routeur]['AS_number'] == as_id:
                 subnets[(routeur, 'Loopback0')] = str(next(loopback_address))
                 interface_ips[(routeur, 'Loopback0')] = str(ipaddress.IPv6Network(subnets[(routeur, 'Loopback0')]).network_address)
 
@@ -158,15 +158,19 @@ def affiche_erreur(erreurs):
 def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data):
     """Configure les routeurs via Telnet avec Exscript."""
     try:
-        IGP = as_data[str(config['AS_number'])]['igp']
+        IGP = as_data[config['AS_number']]['igp']
         host = "localhost"
         port = config['port_telnet']
+        relation_as=as_data[config['AS_number']]["relation"]
+        as_relation={}
+        for key, values in relation_as.items():
+            for value in values:
+                as_relation[int(value)] = key
         conn = Telnet()
         conn.connect(host, port)
-        print(f"Connexion à {routeur} sur le port {port}...")
         conn.send("\rconfigure terminal\r")
         conn.send("ipv6 unicast-routing\r")
-
+        
 
         
         
@@ -206,6 +210,7 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
             conn.send("ipv6 router rip RIPng\r")
             conn.send("redistribute connected\r")
             conn.send("exit\r")
+        #configuration route-map
         
         # Configuration BGP
         conn.send(f"router bgp {config['AS_number']}\r")
@@ -217,6 +222,8 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
                     conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} remote-as {config['AS_number']}\r")
                     conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} update-source Loopback0\r")
                     conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} disable-connected-check\r")
+                    conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} next-hop-self\r")
+                    conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} send-community both\r")
                     conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} activate\r")
         eBGP = False
         
@@ -236,7 +243,17 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
                 if routeur_data[voisin]['AS_number'] != config['AS_number']:
                     eBGP = True
                     conn.send(f"neighbor {ips[(voisin, interface_voisin)]} remote-as {routeur_data[voisin]['AS_number']}\r")
+                   
+                    if as_relation[routeur_data[voisin]['AS_number']]=='provider':
+                        conn.send(f"neighbor {ips[(voisin, interface_voisin)]} route-map PROVIDER_POLICY in\r")
+                        conn.send(f"neighbor {ips[(voisin, interface_voisin)]} route-map PERMIT_ONLY_CUSTOMER_ROUTES out\r")
+                    elif as_relation[routeur_data[voisin]['AS_number']]=='peer':
+                        conn.send(f"neighbor {ips[(voisin, interface_voisin)]} route-map PEER_POLICY in\r")
+                        conn.send(f"neighbor {ips[(voisin, interface_voisin)]} route-map PERMIT_ONLY_CUSTOMER_ROUTES out\r")
+                    else:
+                        conn.send(f"neighbor {ips[(voisin, interface_voisin)]} route-map CLIENT_POLICY in\r")
                     conn.send(f"neighbor {ips[(voisin, interface_voisin)]} activate\r")
+                    
         
         networks_to_advertise = "all"
         advertised_networks = set()
@@ -254,12 +271,25 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
                 for subnet in networks_to_advertise:
                     conn.send(f"network {subnet}\r")
                 
-
         conn.send("exit\r")
 
+        conn.send("exit\r")
+        conn.send("ip bgp-community new-format\r")
+        for a,b,c in (("CLIENT_POLICY","200","100:100"),("PEER_POLICY","150","100:200"),("PROVIDER_POLICY","100","100:300")):
+            conn.send(f"route-map {a} permit 10\r")
+            conn.send(f"set local-preference {b}\r")
+            conn.send(f"set community {c} additive\r")
+            conn.send("exit\r")
+            #conn.send(f"route-map {a} permit 20\r")
+            #conn.send("exit\r")
+        
+        conn.send("ip community-list standard CUSTOMER_ROUTES permit 100:100\r")
+        conn.send("route-map PERMIT_ONLY_CUSTOMER_ROUTES permit 10\r")
+        conn.send("match community CUSTOMER_ROUTES\r")
+        conn.send("exit\r")
+ 
         conn.send("exit\r")
                 
-        conn.send("exit\r")
         #conn.send("write memory\r\r")
         # wait for all the command to finish by looking for the prompt of the ping command on loopback
         conn.send(f"ping {ips[(routeur, 'Loopback0')]}\r")
@@ -293,12 +323,11 @@ if __name__ == "__main__":
         affiche_erreur(erreurs)
         check_for_duplicates_ips(subnets, ips)
 
-        for routeur, config in routeur_data.items():
-            configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data)
+        with multiprocessing.Pool() as pool:
+            pool.starmap(configure_routeur_telnet, [(routeur, config, subnets, ips, connections, as_data) for routeur, config in routeur_data.items()])
 
 
 
     except FileNotFoundError:
         print(f"Erreur : Fichier non trouvé.")
-    except Exception as e:
-        print(f"Erreur lors de l'exécution du script: {e}")
+   
