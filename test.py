@@ -226,7 +226,7 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
                     conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} send-community both\r")
                     conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} activate\r")
         eBGP = False
-            .sleep(0.5)
+        time.sleep(0.5)
         for (routeur1, interface1), (routeur2, interface2) in connections:
             
             if routeur == routeur1:
