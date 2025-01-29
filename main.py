@@ -270,14 +270,14 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
                 if routeur_data[voisin]['AS_number'] != config['AS_number']:
                     eBGP = True
                     conn.send(f"neighbor {ips[(voisin, interface_voisin)]} remote-as {routeur_data[voisin]['AS_number']}\r")
-                    if as_relation[routeur_data[voisin]['AS_number']]=='provider':
-                        conn.send(f"neighbor {ips[(voisin, interface_voisin)]} route-map PROVIDER_POLICY in\r")
-                        conn.send(f"neighbor {ips[(voisin, interface_voisin)]} route-map PERMIT_ONLY_CUSTOMER_ROUTES out\r")
-                    elif as_relation[routeur_data[voisin]['AS_number']]=='peer':
-                        conn.send(f"neighbor {ips[(voisin, interface_voisin)]} route-map PEER_POLICY in\r")
-                        conn.send(f"neighbor {ips[(voisin, interface_voisin)]} route-map PERMIT_ONLY_CUSTOMER_ROUTES out\r")
-                    else:
-                        conn.send(f"neighbor {ips[(voisin, interface_voisin)]} route-map CLIENT_POLICY in\r")
+                    #if as_relation[routeur_data[voisin]['AS_number']]=='provider':
+                        #conn.send(f"neighbor {ips[(voisin, interface_voisin)]} route-map PROVIDER_POLICY in\r")
+                        #conn.send(f"neighbor {ips[(voisin, interface_voisin)]} route-map PERMIT_ONLY_CUSTOMER_ROUTES out\r")
+                    #elif as_relation[routeur_data[voisin]['AS_number']]=='peer':
+                        #conn.send(f"neighbor {ips[(voisin, interface_voisin)]} route-map PEER_POLICY in\r")
+                        #conn.send(f"neighbor {ips[(voisin, interface_voisin)]} route-map PERMIT_ONLY_CUSTOMER_ROUTES out\r")
+                    #else:
+                        #conn.send(f"neighbor {ips[(voisin, interface_voisin)]} route-map CLIENT_POLICY in\r")
                     conn.send(f"neighbor {ips[(voisin, interface_voisin)]} activate\r")
                     conn.send(f"neighbor {ips[(voisin, interface_voisin)]} next-hop-self\r")
                 else: 
