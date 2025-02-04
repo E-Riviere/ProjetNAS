@@ -130,7 +130,7 @@ R13:
     GigabitEthernet1/0:
       R12: GigabitEthernet2/0
     GigabitEthernet2/0:
-      R16: GigabitEthernet2/0
+      R16: GigabitEthernet1/0
 
 R14:
   port_telnet: 5014
@@ -152,5 +152,5 @@ R16:
   port_telnet: 5016
   AS_number: 7
   interface:
-    GigabitEthernet2/0:
+    GigabitEthernet1/0:
       R13: GigabitEthernet2/0
