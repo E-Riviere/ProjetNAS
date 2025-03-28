@@ -242,7 +242,6 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
                 conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} update-source Loopback0\r")
                 conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} disable-connected-check\r")
                 conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} next-hop-self\r")
-                conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} send-community both\r")
                 conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} activate\r")
         eBGP = False
         time.sleep(0.5)
@@ -262,14 +261,6 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
                 if routeur_data[voisin]['AS_number'] != config['AS_number']:
                     eBGP = True
                     conn.send(f"neighbor {ips[(voisin, interface_voisin)]} remote-as {routeur_data[voisin]['AS_number']}\r")
-                    if as_relation[routeur_data[voisin]['AS_number']]=='provider':
-                        conn.send(f"neighbor {ips[(voisin, interface_voisin)]} route-map PROVIDER_POLICY in\r")
-                        conn.send(f"neighbor {ips[(voisin, interface_voisin)]} route-map PERMIT_ONLY_CUSTOMER_ROUTES out\r")
-                    elif as_relation[routeur_data[voisin]['AS_number']]=='peer':
-                        conn.send(f"neighbor {ips[(voisin, interface_voisin)]} route-map PEER_POLICY in\r")
-                        conn.send(f"neighbor {ips[(voisin, interface_voisin)]} route-map PERMIT_ONLY_CUSTOMER_ROUTES out\r")
-                    else:
-                        conn.send(f"neighbor {ips[(voisin, interface_voisin)]} route-map CLIENT_POLICY in\r")
                     conn.send(f"neighbor {ips[(voisin, interface_voisin)]} activate\r")
                     conn.send(f"neighbor {ips[(voisin, interface_voisin)]} next-hop-self\r")
                 
@@ -295,21 +286,8 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
         conn.send("exit\r")
 
         conn.send("exit\r")
-        conn.send("ip bgp-community new-format\r")
-        for a,b,c in (("CLIENT_POLICY","200","100:100"),("PEER_POLICY","150","100:200"),("PROVIDER_POLICY","100","100:300")):
-            conn.send(f"route-map {a} permit 10\r")
-            conn.send(f"set local-preference {b}\r")
-            conn.send(f"set community {c} additive\r")
-            conn.send("exit\r")
 
         
-        conn.send("ip community-list standard BLOCK_ROUTES permit 100:200\r")
-        conn.send("ip community-list standard BLOCK_ROUTES permit 100:300\r")
-        conn.send("route-map PERMIT_ONLY_CUSTOMER_ROUTES deny 10\r")
-        conn.send("match community BLOCK_ROUTES\r")
-        conn.send("exit\r")
-        conn.send("route-map PERMIT_ONLY_CUSTOMER_ROUTES permit 20\r")
-        conn.send("exit\r")
         
         conn.send("exit\r")
 
