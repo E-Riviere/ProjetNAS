@@ -30,9 +30,9 @@ def get_connections(routeur_data):
 def get_AS_number_from_subnet(subnet, as_data):
     for as_id, as_entry in as_data.items():
         for subnet_brut in as_entry.get('plage_adresse', []):
-            int_subnet = int(ipaddress.IPv6Network(subnet).network_address)
-            int_subnet_brut = int(ipaddress.IPv6Network(subnet_brut).network_address)
-            int_mask = int(ipaddress.IPv6Network(subnet_brut).netmask)
+            int_subnet = int(ipaddress.IPv4Network(subnet).network_address)
+            int_subnet_brut = int(ipaddress.IPv4Network(subnet_brut).network_address)
+            int_mask = int(ipaddress.IPv4Network(subnet_brut).netmask)
 
             if int_subnet&int_mask == int_subnet_brut&int_mask: 
                 return as_id
@@ -69,8 +69,8 @@ def get_subnets_and_router_ips(connections, routeur_data, as_data):
         subnets_brut = as_entry.get('plage_adresse', [])
         as_subnets[as_id] = []
         for subnet_brut in subnets_brut:
-            network = ipaddress.IPv6Network(subnet_brut)
-            as_subnets[as_id].extend(network.subnets(new_prefix=64))
+            network = ipaddress.IPv4Network(subnet_brut)
+            as_subnets[as_id].extend(network.subnets(new_prefix=24)) #trouver le nouveau prefix
         as_subnets[as_id] = iter(as_subnets[as_id])
 
     tous_les_subnets = set()
@@ -92,10 +92,10 @@ def get_subnets_and_router_ips(connections, routeur_data, as_data):
             subnet_routers[subnet] = set([(routeur1,interface1), (routeur2,interface2)])
         else:
             if (routeur1, interface1) in subnets:
-                subnet = ipaddress.IPv6Network(subnets[(routeur1, interface1)])
+                subnet = ipaddress.IPv4Network(subnets[(routeur1, interface1)])
                 subnets[(routeur2, interface2)] = str(subnet)
             else:
-                subnet = ipaddress.IPv6Network(subnets[(routeur2, interface2)])
+                subnet = ipaddress.IPv4Network(subnets[(routeur2, interface2)])
                 subnets[(routeur1, interface1)] = str(subnet)
             
             subnet_routers[subnet].add((routeur1,interface1))
@@ -108,11 +108,11 @@ def get_subnets_and_router_ips(connections, routeur_data, as_data):
         while subnet in tous_les_subnets:
             subnet = next(as_subnets[as_id])
         tous_les_subnets.add(subnet)
-        loopback_address = subnet.subnets(new_prefix=128)
+        loopback_address = subnet.subnets(new_prefix=32)
         for routeur, config in routeur_data.items():
             if routeur_data[routeur]['AS_number'] == as_id:
                 subnets[(routeur, 'Loopback0')] = str(next(loopback_address))
-                interface_ips[(routeur, 'Loopback0')] = str(ipaddress.IPv6Network(subnets[(routeur, 'Loopback0')]).network_address)
+                interface_ips[(routeur, 'Loopback0')] = str(ipaddress.IPv4Network(subnets[(routeur, 'Loopback0')]).network_address)
 
 
 
@@ -123,6 +123,7 @@ def get_subnets_and_router_ips(connections, routeur_data, as_data):
     for subnet, routers in subnet_routers.items():
         for i, interface in enumerate(routers):
             if interface not in interface_ips:
+                print(str(subnet[i+1]))
                 interface_ips[interface] = str(subnet[i+1])
     
 
@@ -241,7 +242,6 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
                 conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} update-source Loopback0\r")
                 conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} disable-connected-check\r")
                 conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} next-hop-self\r")
-                conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} send-community both\r")
                 conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} activate\r")
         eBGP = False
         time.sleep(0.5)
@@ -261,14 +261,6 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
                 if routeur_data[voisin]['AS_number'] != config['AS_number']:
                     eBGP = True
                     conn.send(f"neighbor {ips[(voisin, interface_voisin)]} remote-as {routeur_data[voisin]['AS_number']}\r")
-                    if as_relation[routeur_data[voisin]['AS_number']]=='provider':
-                        conn.send(f"neighbor {ips[(voisin, interface_voisin)]} route-map PROVIDER_POLICY in\r")
-                        conn.send(f"neighbor {ips[(voisin, interface_voisin)]} route-map PERMIT_ONLY_CUSTOMER_ROUTES out\r")
-                    elif as_relation[routeur_data[voisin]['AS_number']]=='peer':
-                        conn.send(f"neighbor {ips[(voisin, interface_voisin)]} route-map PEER_POLICY in\r")
-                        conn.send(f"neighbor {ips[(voisin, interface_voisin)]} route-map PERMIT_ONLY_CUSTOMER_ROUTES out\r")
-                    else:
-                        conn.send(f"neighbor {ips[(voisin, interface_voisin)]} route-map CLIENT_POLICY in\r")
                     conn.send(f"neighbor {ips[(voisin, interface_voisin)]} activate\r")
                     conn.send(f"neighbor {ips[(voisin, interface_voisin)]} next-hop-self\r")
                 
@@ -294,21 +286,8 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
         conn.send("exit\r")
 
         conn.send("exit\r")
-        conn.send("ip bgp-community new-format\r")
-        for a,b,c in (("CLIENT_POLICY","200","100:100"),("PEER_POLICY","150","100:200"),("PROVIDER_POLICY","100","100:300")):
-            conn.send(f"route-map {a} permit 10\r")
-            conn.send(f"set local-preference {b}\r")
-            conn.send(f"set community {c} additive\r")
-            conn.send("exit\r")
 
         
-        conn.send("ip community-list standard BLOCK_ROUTES permit 100:200\r")
-        conn.send("ip community-list standard BLOCK_ROUTES permit 100:300\r")
-        conn.send("route-map PERMIT_ONLY_CUSTOMER_ROUTES deny 10\r")
-        conn.send("match community BLOCK_ROUTES\r")
-        conn.send("exit\r")
-        conn.send("route-map PERMIT_ONLY_CUSTOMER_ROUTES permit 20\r")
-        conn.send("exit\r")
         
         conn.send("exit\r")
 
