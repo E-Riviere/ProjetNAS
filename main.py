@@ -167,21 +167,21 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
         conn = Telnet()
         conn.connect(host, port)
         conn.send("\rconfigure terminal\r")
-        conn.send("ipv6 unicast-routing\r")
+        conn.send("ipv4 unicast-routing\r")
         
 
         
         
         for (r, interface), subnet in subnets.items():
             if r == routeur and subnet != "Aucune plage disponible":
-                ipv6_address = ips[(r,interface)]
+                ipv4_address = ips[(r,interface)]
                 conn.send(f"interface {interface}\r")
-                conn.send(f"ipv6 address {ipv6_address}/{ipaddress.IPv6Network(subnet).prefixlen}\r")
-                conn.send("ipv6 enable\r")
+                conn.send(f"ipv4 address {ipv4_address}/{ipaddress.IPv4Network(subnet).prefixlen}\r")
+                conn.send("ipv4 enable\r")
                 conn.send("no shutdown\r")
                 if IGP == "OSPF" :
                     if interface == 'Loopback0':
-                        conn.send(f"ipv6 ospf 1 area 0\r")
+                        conn.send(f"ipv4 ospf 1 area 0\r")
                     else:
                         for (routeur1, interface1), (routeur2, interface2) in connections:
                             if routeur == routeur1 and interface == interface1:
@@ -195,10 +195,10 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
                                 interface_voisin = None
                             if voisin:
                                 if routeur_data[voisin]['AS_number'] == config['AS_number']:
-                                    conn.send(f"ipv6 ospf 1 area 0\r")
+                                    conn.send(f"ipv4 ospf 1 area 0\r")
                 elif IGP == "RIP":
                     if interface == 'Loopback0':
-                        conn.send(f"ipv6 rip RIPng enable\r")
+                        conn.send(f"ipv4 rip RIPng enable\r")
                     else:
                         for (routeur1, interface1), (routeur2, interface2) in connections:
                             if routeur == routeur1 and interface == interface1:
@@ -213,19 +213,19 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
                             if voisin:
                                 if routeur_data[voisin]['AS_number'] == config['AS_number']:
                                     print(f"{routeur} {voisin} {interface} {interface_voisin}")
-                                    conn.send(f"ipv6 rip RIPng enable\r")
+                                    conn.send(f"ipv4 rip RIPng enable\r")
 
         conn.send("exit\r")
         routeur_num = int(routeur[-1])   
         routeur_id = f"{routeur_num//(256*256*256)+1}.{routeur_num% (256*256*256) // (256*256)}.{routeur_num % (256*256) // 256}.{routeur_num%256}"
         # Configuration de l'IGP
         if IGP == "OSPF":
-            conn.send("ipv6 router ospf 1\r")
+            conn.send("ipv4 router ospf 1\r")
             conn.send(f"router-id {routeur_id} \r")
             conn.send("exit\r")
 
         elif IGP == "RIP":
-            conn.send("ipv6 router rip RIPng\r")
+            conn.send("ipv4 router rip RIPng\r")
             conn.send("redistribute connected\r")
             conn.send("exit\r")
         #configuration route-map
@@ -234,7 +234,7 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
         conn.send(f"router bgp {config['AS_number']}\r")
         conn.send("no bgp default ipv4-unicast\r")
         conn.send(f"bgp router-id {routeur_id}\r")
-        conn.send("address-family ipv6 unicast\r")
+        conn.send("address-family ipv4 unicast\r")
         for routeur_id , config_routeur in routeur_data.items():
             if config_routeur['AS_number'] == config['AS_number'] and routeur != routeur_id:
                 conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} remote-as {config['AS_number']}\r")
@@ -281,7 +281,7 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
             if networks_to_advertise == "all":
                 for subnet in subnets.values():
                     
-                    if subnet != "Aucune plage disponible" and ipaddress.IPv6Network(subnet).prefixlen != 128 and subnet not in advertised_networks:
+                    if subnet != "Aucune plage disponible" and ipaddress.IPv4Network(subnet).prefixlen != 128 and subnet not in advertised_networks:
                         if get_AS_number_from_subnet(subnet, as_data) == config['AS_number']:
                             advertised_networks.add(subnet)
                             conn.send(f"network {subnet}\r")
