@@ -168,7 +168,6 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
         conn = Telnet()
         conn.connect(host, port)
         conn.send("\rconfigure terminal\r")
-        conn.send("ipv4 unicast-routing\r")
         
 
         
@@ -177,12 +176,11 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
             if r == routeur and subnet != "Aucune plage disponible":
                 ipv4_address = ips[(r,interface)]
                 conn.send(f"interface {interface}\r")
-                conn.send(f"ipv4 address {ipv4_address}/{ipaddress.IPv4Network(subnet).prefixlen}\r")
-                conn.send("ipv4 enable\r")
+                conn.send(f"ip address {ipv4_address} {ipaddress.IPv4Network(subnet).netmask}\r")
                 conn.send("no shutdown\r")
                 if IGP == "OSPF" :
                     if interface == 'Loopback0':
-                        conn.send(f"ipv4 ospf 1 area 0\r")
+                        conn.send(f"ip ospf 2 area 0\r")
                     else:
                         for (routeur1, interface1), (routeur2, interface2) in connections:
                             if routeur == routeur1 and interface == interface1:
@@ -196,44 +194,21 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
                                 interface_voisin = None
                             if voisin:
                                 if routeur_data[voisin]['AS_number'] == config['AS_number']:
-                                    conn.send(f"ipv4 ospf 1 area 0\r")
-                elif IGP == "RIP":
-                    if interface == 'Loopback0':
-                        conn.send(f"ipv4 rip RIPng enable\r")
-                    else:
-                        for (routeur1, interface1), (routeur2, interface2) in connections:
-                            if routeur == routeur1 and interface == interface1:
-                                voisin = routeur2
-                                interface_voisin = interface2
-                            elif routeur == routeur2 and interface == interface2:
-                                voisin = routeur1
-                                interface_voisin = interface1
-                            else:
-                                voisin = None
-                                interface_voisin = None
-                            if voisin:
-                                if routeur_data[voisin]['AS_number'] == config['AS_number']:
-                                    print(f"{routeur} {voisin} {interface} {interface_voisin}")
-                                    conn.send(f"ipv4 rip RIPng enable\r")
+                                    conn.send(f"ip ospf 2 area 0\r")
 
         conn.send("exit\r")
         routeur_num = int(routeur[-1])   
         routeur_id = f"{routeur_num//(256*256*256)+1}.{routeur_num% (256*256*256) // (256*256)}.{routeur_num % (256*256) // 256}.{routeur_num%256}"
         # Configuration de l'IGP
         if IGP == "OSPF":
-            conn.send("ipv4 router ospf 1\r")
+            conn.send("router ospf 2\r")
             conn.send(f"router-id {routeur_id} \r")
             conn.send("exit\r")
 
-        elif IGP == "RIP":
-            conn.send("ipv4 router rip RIPng\r")
-            conn.send("redistribute connected\r")
-            conn.send("exit\r")
         #configuration route-map
         time.sleep(1)
         # Configuration BGP
         conn.send(f"router bgp {config['AS_number']}\r")
-        conn.send("no bgp default ipv4-unicast\r")
         conn.send(f"bgp router-id {routeur_id}\r")
         conn.send("address-family ipv4 unicast\r")
         for routeur_id , config_routeur in routeur_data.items():

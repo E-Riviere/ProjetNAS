@@ -1,7 +1,7 @@
 1:
   plage_adresse:
     - "201.1.0.0/16"
-  igp: RIP
+  igp: OSPF
   relation:
     client: [2,3,4]
     peer: []
@@ -19,7 +19,7 @@
 3:
   plage_adresse:
     - "201.3.0.0/16"
-  igp: RIP
+  igp: OSPF
   relation:
     client: [6]
     peer: [2,4]
@@ -47,7 +47,7 @@
 6:
   plage_adresse:
     - "201.6.0.0/16"
-  igp: RIP
+  igp: OSPF
   relation:
     client: []
     peer: []
