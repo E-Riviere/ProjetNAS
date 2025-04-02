@@ -86,17 +86,17 @@ def get_subnets_and_router_ips(connections, routeur_data, as_data):
             while subnet in tous_les_subnets:
                 subnet = next(as_subnets[as_id])
             
-            subnets[(routeur1, interface1)] = str(subnet).split("/")[0]+" "+str(subnet.netmask)
-            subnets[(routeur2, interface2)] = str(subnet).split("/")[0]+" "+str(subnet.netmask)
+            subnets[(routeur1, interface1)] = str(subnet)
+            subnets[(routeur2, interface2)] = str(subnet)
             tous_les_subnets.add(subnet)
             subnet_routers[subnet] = set([(routeur1,interface1), (routeur2,interface2)])
         else:
             if (routeur1, interface1) in subnets:
                 subnet = ipaddress.IPv4Network(subnets[(routeur1, interface1)])
-                subnets[(routeur2, interface2)] = str(subnet).split("/")[0]+" "+str(subnet.netmask)
+                subnets[(routeur2, interface2)] = str(subnet)
             else:
                 subnet = ipaddress.IPv4Network(subnets[(routeur2, interface2)])
-                subnets[(routeur1, interface1)] = str(subnet).split("/")[0]+" "+str(subnet.netmask)
+                subnets[(routeur1, interface1)] = str(subnet)
             
             subnet_routers[subnet].add((routeur1,interface1))
             subnet_routers[subnet].add((routeur2,interface2))
@@ -112,7 +112,7 @@ def get_subnets_and_router_ips(connections, routeur_data, as_data):
         for routeur, config in routeur_data.items():
             if routeur_data[routeur]['AS_number'] == as_id:
                 tmp=next(loopback_address)
-                subnets[(routeur, 'Loopback0')] = str(tmp).split("/")[0]+" "+str(tmp.netmask)
+                subnets[(routeur, 'Loopback0')] = str(tmp)
                 interface_ips[(routeur, 'Loopback0')] = str(tmp.network_address)
 
 
@@ -155,8 +155,7 @@ def affiche_erreur(erreurs):
         print("\nAucune incohérence trouvée.")
 
 def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data, routeur_data):
-    """Configure les routeurs via Telnet avec Exscript."""
-    try:
+        print(routeur[-1])
         IGP = as_data[config['AS_number']]['igp']
         host = "localhost"
         port = config['port_telnet']
@@ -199,7 +198,8 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
                                     conn.send(f"ip ospf 2 area 0\r")
 
         conn.send("exit\r")
-        routeur_num = int(routeur[-1])   
+        routeur_num = int(config['port_telnet'])
+
         routeur_id = f"{routeur_num//(256*256*256)+1}.{routeur_num% (256*256*256) // (256*256)}.{routeur_num % (256*256) // 256}.{routeur_num%256}"
         # Configuration de l'IGP
         if IGP == "OSPF":
@@ -254,12 +254,12 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
                     if subnet != "Aucune plage disponible" and ipaddress.IPv4Network(subnet).prefixlen != 128 and subnet not in advertised_networks:
                         if get_AS_number_from_subnet(subnet, as_data) == config['AS_number']:
                             advertised_networks.add(subnet)
-                            conn.send(f"network {subnet}\r")
+                            conn.send(f"network {ipaddress.IPv4Network(subnet).network_address} mask {ipaddress.IPv4Network(subnet).netmask}\r")
 
 
             else:
                 for subnet in networks_to_advertise:
-                    conn.send(f"network {subnet}\r")
+                    conn.send(f"network {ipaddress.IPv4Network(subnet).network_address} mask {ipaddress.IPv4Network(subnet).netmask}\r")
                 
         conn.send("end\r")
 
@@ -272,8 +272,7 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
 
         
 
-    except Exception as e:
-        print(f"Erreur lors de la configuration de {routeur}: {e}")
+
 
 
     
