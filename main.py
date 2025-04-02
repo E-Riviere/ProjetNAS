@@ -86,17 +86,17 @@ def get_subnets_and_router_ips(connections, routeur_data, as_data):
             while subnet in tous_les_subnets:
                 subnet = next(as_subnets[as_id])
             
-            subnets[(routeur1, interface1)] = str(subnet)
-            subnets[(routeur2, interface2)] = str(subnet)
+            subnets[(routeur1, interface1)] = str(subnet).split("/")[0]+" "+str(subnet.netmask)
+            subnets[(routeur2, interface2)] = str(subnet).split("/")[0]+" "+str(subnet.netmask)
             tous_les_subnets.add(subnet)
             subnet_routers[subnet] = set([(routeur1,interface1), (routeur2,interface2)])
         else:
             if (routeur1, interface1) in subnets:
                 subnet = ipaddress.IPv4Network(subnets[(routeur1, interface1)])
-                subnets[(routeur2, interface2)] = str(subnet)
+                subnets[(routeur2, interface2)] = str(subnet).split("/")[0]+" "+str(subnet.netmask)
             else:
                 subnet = ipaddress.IPv4Network(subnets[(routeur2, interface2)])
-                subnets[(routeur1, interface1)] = str(subnet)
+                subnets[(routeur1, interface1)] = str(subnet).split("/")[0]+" "+str(subnet.netmask)
             
             subnet_routers[subnet].add((routeur1,interface1))
             subnet_routers[subnet].add((routeur2,interface2))
@@ -111,8 +111,9 @@ def get_subnets_and_router_ips(connections, routeur_data, as_data):
         loopback_address = subnet.subnets(new_prefix=32)
         for routeur, config in routeur_data.items():
             if routeur_data[routeur]['AS_number'] == as_id:
-                subnets[(routeur, 'Loopback0')] = str(next(loopback_address))
-                interface_ips[(routeur, 'Loopback0')] = str(ipaddress.IPv4Network(subnets[(routeur, 'Loopback0')]).network_address)
+                tmp=next(loopback_address)
+                subnets[(routeur, 'Loopback0')] = str(tmp).split("/")[0]+" "+str(tmp.netmask)
+                interface_ips[(routeur, 'Loopback0')] = str(tmp.network_address)
 
 
 
@@ -123,7 +124,6 @@ def get_subnets_and_router_ips(connections, routeur_data, as_data):
     for subnet, routers in subnet_routers.items():
         for i, interface in enumerate(routers):
             if interface not in interface_ips:
-                print(str(subnet[i+1]))
                 interface_ips[interface] = str(subnet[i+1])
     
 
