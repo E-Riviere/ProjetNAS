@@ -169,7 +169,9 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
         conn.connect(host, port)
         conn.send("\rconfigure terminal\r")
         
-
+        #configuration mpls
+        conn.send("mpls ip\r")
+        conn.send("mpls label protocol ldp\r")
         
         
         for (r, interface), subnet in subnets.items():
@@ -203,6 +205,7 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
         if IGP == "OSPF":
             conn.send("router ospf 2\r")
             conn.send(f"router-id {routeur_id} \r")
+            conn.send("mpls ldp autoconfig area 0\r")
             conn.send("exit\r")
 
         #configuration route-map
@@ -258,13 +261,7 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
                 for subnet in networks_to_advertise:
                     conn.send(f"network {subnet}\r")
                 
-        conn.send("exit\r")
-
-        conn.send("exit\r")
-
-        
-        
-        conn.send("exit\r")
+        conn.send("end\r")
 
 
         conn.send(f"ping {ips[(routeur, 'Loopback0')]}\r")

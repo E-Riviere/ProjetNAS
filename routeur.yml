@@ -7,7 +7,7 @@ CE1:
 
 PE1:
   port_telnet: 5001
-  AS_number: 1
+  AS_number: 2
   interface:
     GigabitEthernet1/0:
       CE1: GigabitEthernet1/0
@@ -25,7 +25,7 @@ P2:
 
 P3:
   port_telnet: 5003
-  AS_number: 3
+  AS_number: 2
   interface:
     GigabitEthernet1/0:
       P2: GigabitEthernet2/0
@@ -34,7 +34,7 @@ P3:
 
 PE2:
   port_telnet: 5004
-  AS_number: 3
+  AS_number: 2
   interface:
     GigabitEthernet1/0:
       P3: GigabitEthernet2/0
