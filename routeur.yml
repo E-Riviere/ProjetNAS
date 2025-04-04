@@ -43,7 +43,7 @@ PE2:
 
 CE2:
   port_telnet: 5010
-  AS_number: 3
+  AS_number: 1
   interface:
     GigabitEthernet1/0:
       PE2: GigabitEthernet2/0
