@@ -144,14 +144,18 @@ def affiche_connexion(connections, subnets, routeur_data):
             print(f"AS : {routeur_data[interface[0]]['AS_number']} : {subnet}")
 
 
-def get_routeur_bordure(routeur_data):
-    routeur_bordure=set({})
+def get_routeur_bordure(routeur_data,as_data):
+    bordure_client=set({})
+    bordure_provider=set({})
     for routeur_id , config_routeur in routeur_data.items():
         for conn in config_routeur["interface"].values():
             for routeur_vois in conn.keys():
                 if config_routeur["AS_number"]!=routeur_data[routeur_vois]["AS_number"]:
-                    routeur_bordure.add(routeur_id)
-    return list(routeur_bordure)
+                    if as_data[config_routeur["AS_number"]]["type"]=="client":
+                        bordure_client.add(routeur_id)
+                    if as_data[config_routeur["AS_number"]]["type"]=="provider":
+                        bordure_provider.add(routeur_id)
+    return list(bordure_client),list(bordure_provider)
 def affiche_erreur(erreurs):
     if erreurs:
         print("\nIncohérences détectées:")
@@ -296,7 +300,7 @@ if __name__ == "__main__":
         affiche_connexion(connections, subnets, routeur_data)
         affiche_erreur(erreurs)
         check_for_duplicates_ips(subnets, ips)
-        rb=get_routeur_bordure(routeur_data)
+        bordure_client,bordure_provider=get_routeur_bordure(routeur_data,as_data)
 
         with multiprocessing.Pool() as pool:
             pool.starmap(configure_routeur_telnet, [(routeur, config, subnets, ips, connections, as_data, routeur_data) for routeur, config in routeur_data.items()])
