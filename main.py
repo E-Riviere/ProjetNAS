@@ -144,8 +144,14 @@ def affiche_connexion(connections, subnets, routeur_data):
             print(f"AS : {routeur_data[interface[0]]['AS_number']} : {subnet}")
 
 
-
-
+def get_routeur_bordure(routeur_data):
+    routeur_bordure=set({})
+    for routeur_id , config_routeur in routeur_data.items():
+        for conn in config_routeur["interface"].values():
+            for routeur_vois in conn.keys():
+                if config_routeur["AS_number"]!=routeur_data[routeur_vois]["AS_number"]:
+                    routeur_bordure.add(routeur_id)
+    return list(routeur_bordure)
 def affiche_erreur(erreurs):
     if erreurs:
         print("\nIncohérences détectées:")
@@ -169,8 +175,7 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
         conn.send("\rconfigure terminal\r")
         
         #configuration mpls
-        conn.send("mpls ip\r")
-        conn.send("mpls label protocol ldp\r")
+
         
         
         for (r, interface), subnet in subnets.items():
@@ -211,10 +216,13 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
         #configuration route-map
         time.sleep(1)
         # Configuration BGP
+        conn.send("mpls ip\r")
+        conn.send("mpls label protocol ldp\r")
         conn.send(f"router bgp {config['AS_number']}\r")
         conn.send(f"bgp router-id {routeur_id}\r")
         conn.send("address-family ipv4 unicast\r")
         for routeur_id , config_routeur in routeur_data.items():
+            #configuration IBGP
             if config_routeur['AS_number'] == config['AS_number'] and routeur != routeur_id:
                 conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} remote-as {config['AS_number']}\r")
                 conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} update-source Loopback0\r")
@@ -292,6 +300,7 @@ if __name__ == "__main__":
         affiche_connexion(connections, subnets, routeur_data)
         affiche_erreur(erreurs)
         check_for_duplicates_ips(subnets, ips)
+        rb=get_routeur_bordure(routeur_data)
 
         with multiprocessing.Pool() as pool:
             pool.starmap(configure_routeur_telnet, [(routeur, config, subnets, ips, connections, as_data, routeur_data) for routeur, config in routeur_data.items()])
