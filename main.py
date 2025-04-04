@@ -159,11 +159,7 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
         IGP = as_data[config['AS_number']]['igp']
         host = "localhost"
         port = config['port_telnet']
-        relation_as=as_data[config['AS_number']]["relation"]
-        as_relation={}
-        for key, values in relation_as.items():
-            for value in values:
-                as_relation[int(value)] = key
+
         conn = Telnet()
         conn.connect(host, port)
         conn.send("\rconfigure terminal\r")

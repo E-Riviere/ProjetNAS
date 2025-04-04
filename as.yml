@@ -2,63 +2,16 @@
   plage_adresse:
     - "201.1.0.0/16"
   igp: OSPF
-  relation:
-    client: [2,3,4]
-    peer: []
-    provider: []
+  type : "client"
 
 2:
   plage_adresse:
     - "201.2.0.0/16"
   igp: OSPF
-  relation:
-    client: [5]
-    peer: [3]
-    provider: [1]
-
+  type : "provider"
 3:
   plage_adresse:
     - "201.3.0.0/16"
   igp: OSPF
-  relation:
-    client: [6]
-    peer: [2,4]
-    provider: [1]
+  type : "client"
 
-
-4:
-  plage_adresse:
-    - "201.4.0.0/16"
-  igp: OSPF
-  relation:
-    client: [7]
-    peer: [3]
-    provider: [1]
-
-5:
-  plage_adresse:
-    - "201.5.0.0/16"
-  igp: OSPF
-  relation:
-    client: []
-    peer: []
-    provider: [2]
-
-6:
-  plage_adresse:
-    - "201.6.0.0/16"
-  igp: OSPF
-  relation:
-    client: []
-    peer: []
-    provider: [3]
-
-
-7:
-  plage_adresse:
-    - "201.7.0.0/16"
-  igp: OSPF
-  relation:
-    client: []
-    peer: []
-    provider: [4]
