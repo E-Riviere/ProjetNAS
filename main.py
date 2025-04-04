@@ -182,6 +182,9 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
             if r == routeur and subnet != "Aucune plage disponible":
                 ipv4_address = ips[(r,interface)]
                 conn.send(f"interface {interface}\r")
+                if routeur in bordure_provider:
+                     #TODO : ajout de ip vrf forwarding 'vrf name'
+                     pass
                 conn.send(f"ip address {ipv4_address} {ipaddress.IPv4Network(subnet).netmask}\r")
                 conn.send("no shutdown\r")
                 if IGP == "OSPF" :
@@ -271,7 +274,7 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
                 if networks_to_advertise == "all":
                     for subnet in subnets.values():
                         
-                        if subnet != "Aucune plage disponible" and ipaddress.IPv4Network(subnet).prefixlen != 128 and subnet not in advertised_networks:
+                        if subnet != "Aucune plage disponible" and ipaddress.IPv4Network(subnet).prefixlen != 32 and subnet not in advertised_networks and as_data[config['AS_number']]['type']=='client' :
                             if get_AS_number_from_subnet(subnet, as_data) == config['AS_number']:
                                 advertised_networks.add(subnet)
                                 conn.send(f"network {ipaddress.IPv4Network(subnet).network_address} mask {ipaddress.IPv4Network(subnet).netmask}\r")
