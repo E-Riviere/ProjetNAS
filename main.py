@@ -217,7 +217,7 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
         conn.send("mpls ip\r")
         conn.send("mpls label protocol ldp\r")
         # Configuration BGP
-        if (routeur in bordure_provider) or (as_data[config['AS_number']]['type']=='client'):
+        if as_data[config['AS_number']]['type']=='client':
             conn.send(f"router bgp {config['AS_number']}\r")
             conn.send(f"bgp router-id {routeur_id}\r")
             conn.send("address-family ipv4 unicast\r")
@@ -280,7 +280,82 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
                 else:
                     for subnet in networks_to_advertise:
                         conn.send(f"network {ipaddress.IPv4Network(subnet).network_address} mask {ipaddress.IPv4Network(subnet).netmask}\r")
+
+        elif routeur in bordure_provider:
+
+            conn.send(f"router bgp {config['AS_number']}\r")
+            conn.send(f"bgp router-id {routeur_id}\r")
+            conn.send("address-family ipv4 unicast\r")
+            for routeur_id , config_routeur in routeur_data.items():
+                #configuration IBGP
+                if config_routeur['AS_number'] == config['AS_number'] and routeur != routeur_id:
+                    if routeur_id in bordure_provider: #routeur : id routeur en configuration et routeur_id : routeur id du voisin 
+                        conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} remote-as {config['AS_number']}\r")
+                        conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} update-source Loopback0\r")
+            conn.send("exit\r")
+            conn.send("address-family vpnv4\r")
+            for routeur_id , config_routeur in routeur_data.items():
+                #configuration IBGP
+                if config_routeur['AS_number'] == config['AS_number'] and routeur != routeur_id:
+                    if routeur_id in bordure_provider: #routeur : id routeur en configuration et routeur_id : routeur id du voisin 
+                        conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} activate\r")
+                        conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} send-community both\r")
+                        
+            conn.send("end\r")
+            
+
+
+            eBGP = False
+            time.sleep(0.5)
+            for (routeur1, interface1), (routeur2, interface2) in connections:
                 
+                if routeur == routeur1:
+                    voisin = routeur2
+                    interface_voisin = interface2
+
+                elif routeur == routeur2:
+                    voisin = routeur1
+                    interface_voisin = interface1
+                else:
+                    voisin = None
+                    interface_voisin = None
+                if voisin:
+                    if routeur_data[voisin]['AS_number'] != config['AS_number']:
+                        eBGP = True
+                        #on ignore le prblème : vérifier que la co est bien vers un client 
+                        conn.send("config t\r")
+                        conn.send(f"ip vrf client{routeur_data[voisin]['AS_number']}\r")
+                        conn.send(f"rd {routeur_data[voisin]['AS_number']}:{routeur_data[voisin]['port_telnet']}\r")
+                        conn.send(f"route-target both {routeur_data[voisin]['AS_number']}:{routeur_data[voisin]['AS_number']}\r")
+
+                        conn.send("end\r")
+
+                        conn.send("config t\r")
+                        conn.send(f"router bgp {config['AS_number']}\r")
+                        conn.send(f"address-family ipv4 vrf client{routeur_data[voisin]['AS_number']}\r")
+                        conn.send(f"neighbor {ips[(voisin, interface_voisin)]} remote-as {routeur_data[voisin]['AS_number']}\r")
+                        conn.send(f"neighbor {ips[(voisin, interface_voisin)]} activate\r")
+                        conn.send(f"neighbor {ips[(voisin, interface_voisin)]} next-hop-self\r")
+                    
+
+                        
+            time.sleep(0.5)
+            networks_to_advertise = "all"
+            advertised_networks = set()
+            if eBGP:
+                if networks_to_advertise == "all":
+                    for subnet in subnets.values():
+                        
+                        if subnet != "Aucune plage disponible" and ipaddress.IPv4Network(subnet).prefixlen != 128 and subnet not in advertised_networks:
+                            if get_AS_number_from_subnet(subnet, as_data) == config['AS_number']:
+                                advertised_networks.add(subnet)
+                                conn.send(f"network {ipaddress.IPv4Network(subnet).network_address} mask {ipaddress.IPv4Network(subnet).netmask}\r")
+
+
+                else:
+                    for subnet in networks_to_advertise:
+                        conn.send(f"network {ipaddress.IPv4Network(subnet).network_address} mask {ipaddress.IPv4Network(subnet).netmask}\r")
+
         conn.send("end\r")
 
 
