@@ -163,7 +163,30 @@ def affiche_erreur(erreurs):
             print(erreur)
     else:
         print("\nAucune incohérence trouvée.")
-
+        
+def get_network_to_advivertise_per_router(routeur_data,bordure_client,subnet,connection):
+    network_to_advertise={}
+    for i in bordure_client:
+        print(f' aaaa {i}   ')
+        visited=[]
+        to_visit=[i]
+        network_to_advertise[i]=[]
+        while to_visit!=[]:
+            rout=to_visit.pop(0)
+            for y in subnet:
+                if y[0]==rout:
+                    network_to_advertise[i].append(subnet[y])
+            for k in connections:
+                if rout == k[0][0] and routeur_data[k[1][0]]["AS_number"]==routeur_data[i]["AS_number"]:
+                    if routeur_data[k[1][0]] not in visited:
+                        to_visit.append(routeur_data[k[1][0]])
+                elif rout == k[1][0] and routeur_data[k[0][0]]["AS_number"]==routeur_data[i]["AS_number"]:
+                    if routeur_data[k[0][0]] not in visited:
+                        to_visit.append(routeur_data[k[0][0]])
+            visited.append(rout)
+    return network_to_advertise
+            
+    
 def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data, routeur_data, bordure_client, bordure_provider):
         print(routeur[-1])
         IGP = as_data[config['AS_number']]['igp']
@@ -391,6 +414,7 @@ if __name__ == "__main__":
         affiche_erreur(erreurs)
         check_for_duplicates_ips(subnets, ips)
         bordure_client,bordure_provider=get_routeur_bordure(routeur_data,as_data)
+        network_to_advertise=get_network_to_advivertise_per_router(routeur_data,bordure_client,subnets,connections)
 
         with multiprocessing.Pool() as pool:
             pool.starmap(configure_routeur_telnet, [(routeur, config, subnets, ips, connections, as_data, routeur_data, bordure_client, bordure_provider) for routeur, config in routeur_data.items()])
