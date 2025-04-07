@@ -164,18 +164,18 @@ def affiche_erreur(erreurs):
     else:
         print("\nAucune incohérence trouvée.")
         
-def get_network_to_advivertise_per_router(routeur_data,bordure_client,subnet,connection):
+def get_network_to_advivertise_per_router(routeur_data,bordure_client,subnet,connections):
     network_to_advertise={}
     for i in bordure_client:
         print(f' aaaa {i}   ')
         visited=[]
         to_visit=[i]
-        network_to_advertise[i]=[]
+        network_to_advertise[i]=set({})
         while to_visit!=[]:
             rout=to_visit.pop(0)
             for y in subnet:
                 if y[0]==rout:
-                    network_to_advertise[i].append(subnet[y])
+                    network_to_advertise[i].add(subnet[y])
             for k in connections:
                 if rout == k[0][0] and routeur_data[k[1][0]]["AS_number"]==routeur_data[i]["AS_number"]:
                     if routeur_data[k[1][0]] not in visited:
