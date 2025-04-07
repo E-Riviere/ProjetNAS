@@ -179,7 +179,7 @@ def get_network_to_advivertise_per_router(routeur_data,bordure_client,subnet,con
             for k in connections:
                 if rout == k[0][0] and routeur_data[k[1][0]]["AS_number"]==routeur_data[i]["AS_number"]:
                     if routeur_data[k[1][0]] not in visited:
-                        to_visit.append(routeur_data[k[1][0]])
+                        to_visit.add(routeur_data[k[1][0]])
                 elif rout == k[1][0] and routeur_data[k[0][0]]["AS_number"]==routeur_data[i]["AS_number"]:
                     if routeur_data[k[0][0]] not in visited:
                         to_visit.append(routeur_data[k[0][0]])
@@ -206,8 +206,11 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
                 ipv4_address = ips[(r,interface)]
                 conn.send(f"interface {interface}\r")
                 if routeur in bordure_provider:
-                     #TODO : ajout de ip vrf forwarding 'vrf name'
-                     pass
+                     for a in connections:
+                         if (r, interface) == a[0] and routeur[a[1][0]]["AS_number"]!=routeur_data[r]["AS_number"]:
+                             conn.send(f"ip vrf forwarding client{routeur_data[a[1][0]]['AS_number']}\r")
+                         elif (r, interface) == a[1] and routeur[a[0][0]]["AS_number"]!=routeur_data[r]["AS_number"]:
+                             conn.send(f"ip vrf forwarding client{routeur_data[a[0][0]]['AS_number']}\r")
                 conn.send(f"ip address {ipv4_address} {ipaddress.IPv4Network(subnet).netmask}\r")
                 conn.send("no shutdown\r")
                 if IGP == "OSPF" :
