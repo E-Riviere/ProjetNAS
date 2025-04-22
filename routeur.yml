@@ -1,49 +1,135 @@
 CE1:
-  port_telnet: 5005
+  port_telnet: 5006
   AS_number: 1
   interface:
     GigabitEthernet1/0:
       PE1: GigabitEthernet1/0
+    GigabitEthernet2/0:
+      C1: GigabitEthernet1/0
+
+C1:
+  port_telnet: 5000
+  AS_number: 1
+  interface:
+    GigabitEthernet1/0:
+      CE1: GigabitEthernet2/0
+
+CE3:
+  port_telnet: 5015
+  AS_number: 4
+  interface:
+    GigabitEthernet1/0:
+      PE4: GigabitEthernet3/0
+    GigabitEthernet2/0:
+      C3: GigabitEthernet1/0
+    
+
+C3:
+  port_telnet: 5029
+  AS_number: 4
+  interface:
+    GigabitEthernet1/0:
+      CE3: GigabitEthernet2/0
 
 PE1:
-  port_telnet: 5006
+  port_telnet: 5002
   AS_number: 2
   interface:
     GigabitEthernet1/0:
       CE1: GigabitEthernet1/0
     GigabitEthernet2/0:
       P2: GigabitEthernet1/0
+    GigabitEthernet3/0:
+      CE4: GigabitEthernet1/0
 
 P2:
-  port_telnet: 5007
+  port_telnet: 5003
   AS_number: 2
   interface:
     GigabitEthernet1/0:
       PE1: GigabitEthernet2/0
     GigabitEthernet2/0:
       P3: GigabitEthernet1/0
+    GigabitEthernet3/0:
+      PE5: GigabitEthernet1/0
 
+PE5:
+  port_telnet: 5016
+  AS_number: 2
+  interface:
+    GigabitEthernet1/0:
+      P2: GigabitEthernet3/0
+    GigabitEthernet2/0:
+      P3: GigabitEthernet3/0
+    GigabitEthernet3/0:
+      CE5: GigabitEthernet1/0
+
+CE5:
+  port_telnet: 5017
+  AS_number: 5
+  interface:
+    GigabitEthernet1/0:
+      PE5: GigabitEthernet3/0
+    GigabitEthernet2/0:
+      C5: GigabitEthernet1/0
+
+C5:
+  port_telnet: 5027
+  AS_number: 5
+  interface:
+    GigabitEthernet1/0:
+      CE5: GigabitEthernet2/0
+      
 P3:
-  port_telnet: 5008
+  port_telnet: 5004
   AS_number: 2
   interface:
     GigabitEthernet1/0:
       P2: GigabitEthernet2/0
     GigabitEthernet2/0:
-      PE2: GigabitEthernet1/0
+      PE4: GigabitEthernet1/0
+    GigabitEthernet3/0:
+      PE5: GigabitEthernet2/0
 
-PE2:
-  port_telnet: 5009
+PE4:
+  port_telnet: 5005
   AS_number: 2
   interface:
     GigabitEthernet1/0:
       P3: GigabitEthernet2/0
     GigabitEthernet2/0:
       CE2: GigabitEthernet1/0
+    GigabitEthernet3/0:
+      CE3: GigabitEthernet1/0
 
 CE2:
-  port_telnet: 5010
+  port_telnet: 5007
   AS_number: 3
   interface:
     GigabitEthernet1/0:
-      PE2: GigabitEthernet2/0
+      PE4: GigabitEthernet2/0
+    GigabitEthernet2/0:
+      C2: GigabitEthernet1/0
+
+C2:
+  port_telnet: 5028
+  AS_number: 3
+  interface:
+    GigabitEthernet1/0:
+      CE2: GigabitEthernet2/0
+
+CE4:
+  port_telnet: 5014
+  AS_number: 6
+  interface:
+    GigabitEthernet1/0:
+      PE1: GigabitEthernet3/0
+    GigabitEthernet2/0:
+      C4: GigabitEthernet1/0
+
+C4:
+  port_telnet: 5001
+  AS_number: 6
+  interface:
+    GigabitEthernet1/0:
+      CE4: GigabitEthernet2/0
