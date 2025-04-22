@@ -1,0 +1,32 @@
+client1:
+  CE :
+    ["CE5"]
+  rt :
+    1:100
+  sharing:
+    [client2,client3]
+
+client2:
+  CE :
+    ["CE3"]
+  rt :
+    1:200
+  sharing:
+    [client1]
+
+client3:
+  CE :
+    ["CE4"]
+  rt :
+    1:300
+  sharing:
+    [client1]
+
+client4:
+  CE :
+    ["CE1","CE2"]
+  rt :
+    1:400
+  sharing:
+    []
+ 
