@@ -15,3 +15,18 @@
   igp: OSPF
   type : "client"
 
+4:
+  plage_adresse:
+    - "201.4.0.0/16"
+  igp: OSPF
+  type : "client"
+5:
+  plage_adresse:
+    - "201.5.0.0/16"
+  igp: OSPF
+  type : "client"
+6:
+  plage_adresse:
+    - "201.6.0.0/16"
+  igp: OSPF
+  type : "client"

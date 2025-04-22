@@ -4,6 +4,8 @@ from Exscript.protocols import Telnet
 import multiprocessing
 import time
 
+global rd
+rd = 0
 
 def load_yaml(filename):
     with open(filename, 'r') as file:
@@ -156,6 +158,7 @@ def get_routeur_bordure(routeur_data,as_data):
                     if as_data[config_routeur["AS_number"]]["type"]=="provider":
                         bordure_provider.add(routeur_id)
     return list(bordure_client),list(bordure_provider)
+
 def affiche_erreur(erreurs):
     if erreurs:
         print("\nIncohérences détectées:")
@@ -163,6 +166,7 @@ def affiche_erreur(erreurs):
             print(erreur)
     else:
         print("\nAucune incohérence trouvée.")
+
         
 def get_network_to_advivertise_per_router(routeur_data,bordure_client,subnet,connections):
     network_to_advertise={}
@@ -186,8 +190,10 @@ def get_network_to_advivertise_per_router(routeur_data,bordure_client,subnet,con
             visited.append(rout)
     return network_to_advertise
             
-    
-def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data, routeur_data, bordure_client, bordure_provider):
+  
+
+def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data, routeur_data, bordure_client, bordure_provider, vrf_data):
+        global rd
         print(routeur[-1])
         IGP = as_data[config['AS_number']]['igp']
         host = "localhost"
@@ -349,15 +355,22 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
                     voisin = None
                     interface_voisin = None
                 if voisin:
+                    if voisin in bordure_client:
+                        for (name,client) in vrf_data.items():
+                            for CE in client['CE']:
+                                print(type(client['rt']))
+                                if voisin == CE:
+                                    rd += 1
+                                    conn.send("config t\r")
+                                    conn.send(f"ip vrf {name}\r")
+                                    conn.send(f"rd {rd}:{rd}\r")
+                                    conn.send(f"route-target both {client['rt']}\r")
+                                    for shared in client['sharing']:                
+                                        conn.send(f"route-target import {vrf_data[shared]['rt']}\r")
+                                    conn.send("end\r")
                     if routeur_data[voisin]['AS_number'] != config['AS_number']:
                         eBGP = True
-                        #on ignore le prblème : vérifier que la co est bien vers un client 
-                        conn.send("config t\r")
-                        conn.send(f"ip vrf client{routeur_data[voisin]['AS_number']}\r")
-                        conn.send(f"rd {routeur_data[voisin]['AS_number']}:{routeur_data[voisin]['port_telnet']}\r")
-                        conn.send(f"route-target both {routeur_data[voisin]['AS_number']}:{routeur_data[voisin]['AS_number']}\r")
-
-                        conn.send("end\r")
+                        
 
                         conn.send("config t\r")
                         conn.send(f"router bgp {config['AS_number']}\r")
@@ -392,8 +405,6 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
         conn.waitfor("Sending 5, 100-byte ICMP Echos")
 
         print(f"Configuration de {routeur} terminée.")
-
-
         
 
 
@@ -406,11 +417,14 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
 if __name__ == "__main__":
     as_file = "as.yml"
     routeur_file = "routeur.yml"
+    vrf_file = "vrf.yml"
     try:
         as_data = load_yaml(as_file)
         routeur_data = load_yaml(routeur_file)
+        vrf_data = load_yaml(vrf_file)
 
         connections, erreurs = get_connections(routeur_data)
+
         
         subnets,ips = get_subnets_and_router_ips(connections, routeur_data, as_data)
         affiche_connexion(connections, subnets, routeur_data)
@@ -420,7 +434,7 @@ if __name__ == "__main__":
         network_to_advertise=get_network_to_advivertise_per_router(routeur_data,bordure_client,subnets,connections)
 
         with multiprocessing.Pool() as pool:
-            pool.starmap(configure_routeur_telnet, [(routeur, config, subnets, ips, connections, as_data, routeur_data, bordure_client, bordure_provider) for routeur, config in routeur_data.items()])
+            pool.starmap(configure_routeur_telnet, [(routeur, config, subnets, ips, connections, as_data, routeur_data, bordure_client, bordure_provider,vrf_data) for routeur, config in routeur_data.items()])
 
 
 
