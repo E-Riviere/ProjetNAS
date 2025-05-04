@@ -201,16 +201,21 @@ def get_network_to_advivertise_per_router(routeur_data,bordure_client,subnet,con
 
 
 def send_ibgp_peers(conn, routeur, config, routeur_data, ips, bordure_provider, address_family):
-    for routeur_id, config_routeur in routeur_data.items():
-        if config_routeur['AS_number'] == config['AS_number'] and routeur != routeur_id and routeur_id in bordure_provider:
+    for routeur_name, config_routeur in routeur_data.items():
+        if config_routeur['AS_number'] == config['AS_number'] and routeur != routeur_name and routeur_name in bordure_provider:
             
+            conn.send("exit \r")
+            conn.send(f"neighbor {ips[(routeur_name, 'Loopback0')]} remote-as {config['AS_number']}\r")
+            conn.send(f"neighbor {ips[(routeur_name, 'Loopback0')]} update-source Loopback0\r")
 
+            conn.send(f"address-family {address_family}\r")
+            conn.send(f"neighbor {ips[(routeur_name, 'Loopback0')]} activate\r")
             if address_family == "ipv4":
-                conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} disable-connected-check\r")
-                conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} next-hop-self\r")
+                conn.send(f"neighbor {ips[(routeur_name, 'Loopback0')]} disable-connected-check\r")
+                conn.send(f"neighbor {ips[(routeur_name, 'Loopback0')]} next-hop-self\r")
             if address_family == "vpnv4":
-                conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} send-community both\r")
-            conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} activate\r")
+                conn.send(f"neighbor {ips[(routeur_name, 'Loopback0')]} send-community both\r")
+            
 
 def configure_interfaces(conn, routeur, config, subnets, ips, connections, as_data, routeur_data, bordure_provider, IGP):
     
@@ -256,11 +261,12 @@ def configure_interfaces(conn, routeur, config, subnets, ips, connections, as_da
                             if routeur_data[voisin]['AS_number'] == config['AS_number']:
                                 conn.send("ip ospf 2 area 0\r")
 
-def configure_ospf(conn, IGP, routeur_id):
+def configure_ospf(conn, IGP, routeur_id, type_as):
     if IGP == "OSPF":
         conn.send("router ospf 2\r")
         conn.send(f"router-id {routeur_id}\r")
-        conn.send("mpls ldp autoconfig area 0\r")
+        if type_as == 'provider':
+            conn.send("mpls ldp autoconfig area 0\r")
         conn.send("exit\r")
 
 def configure_mpls(conn):
@@ -271,13 +277,11 @@ def configure_mpls(conn):
 def configure_bgp_ibgp(conn, routeur, config, routeur_data, ips, bordure_provider, routeur_id, type_as):
     conn.send(f"router bgp {config['AS_number']}\r")
     conn.send(f"bgp router-id {routeur_id}\r")
-    conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} remote-as {config['AS_number']}\r")
     
     if type_as == 'client':
         conn.send("address-family ipv4 unicast\r")
         send_ibgp_peers(conn, routeur, config, routeur_data, ips, bordure_provider, address_family="ipv4")
     elif routeur in bordure_provider:
-        conn.send(f"neighbor {ips[(routeur_id, 'Loopback0')]} update-source Loopback0\r")
         for af in ["vpnv4"]:
             conn.send(f"address-family {af}\r")
             send_ibgp_peers(conn, routeur, config, routeur_data, ips, bordure_provider, address_family="vpnv4" if af == "vpnv4" else "ipv4")
@@ -347,10 +351,11 @@ def configure_routeur_telnet(routeur, config, subnets, ips, connections, as_data
 
     routeur_num = int(config['port_telnet'])
     routeur_id = f"{routeur_num//(256*256*256)+1}.{routeur_num% (256*256*256) // (256*256)}.{routeur_num % (256*256) // 256}.{routeur_num%256}"
-
-    configure_ospf(conn, IGP, routeur_id)
-    configure_mpls(conn)
     type_as = as_data[config['AS_number']]['type']
+    configure_ospf(conn, IGP, routeur_id,type_as)
+    if type_as == 'provider':
+        configure_mpls(conn)
+    
     configure_bgp_ibgp(conn, routeur, config, routeur_data, ips, bordure_provider, routeur_id, type_as)
 
     eBGP = configure_bgp_ebgp(conn, routeur, config, connections, ips, routeur_data, bordure_client, bordure_provider, vrf_data, type_as,shm_name)
