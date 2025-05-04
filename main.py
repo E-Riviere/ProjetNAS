@@ -201,6 +201,7 @@ def get_network_to_advivertise_per_router(routeur_data,bordure_client,subnet,con
 
 
 def send_ibgp_peers(conn, routeur, config, routeur_data, ips, bordure_provider, address_family):
+    as_type = as_data[config['AS_number']]['type']
     for routeur_name, config_routeur in routeur_data.items():
         if config_routeur['AS_number'] == config['AS_number'] and routeur != routeur_name and routeur_name in bordure_provider:
             
@@ -215,6 +216,16 @@ def send_ibgp_peers(conn, routeur, config, routeur_data, ips, bordure_provider, 
                 conn.send(f"neighbor {ips[(routeur_name, 'Loopback0')]} next-hop-self\r")
             if address_family == "vpnv4":
                 conn.send(f"neighbor {ips[(routeur_name, 'Loopback0')]} send-community both\r")
+        elif as_type == 'client' and config_routeur['AS_number'] == config['AS_number']:
+            conn.send("exit \r")
+            conn.send(f"neighbor {ips[(routeur_name, 'Loopback0')]} remote-as {config['AS_number']}\r")
+            conn.send(f"neighbor {ips[(routeur_name, 'Loopback0')]} update-source Loopback0\r")
+
+            conn.send(f"address-family ipv4 unicast\r")
+            conn.send(f"neighbor {ips[(routeur_name, 'Loopback0')]} activate\r")
+            conn.send(f"neighbor {ips[(routeur_name, 'Loopback0')]} disable-connected-check\r")
+            conn.send(f"neighbor {ips[(routeur_name, 'Loopback0')]} next-hop-self\r")
+
             
 
 def configure_interfaces(conn, routeur, config, subnets, ips, connections, as_data, routeur_data, bordure_provider, IGP):
